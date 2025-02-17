@@ -272,6 +272,12 @@ def add_vsb_cmdline_args(
         env_var="VSB__PINECONE_API_KEY",
     )
     pinecone_group.add_argument(
+        "--pinecone_host",
+        type=str,
+        help="host name for the Pinecone controller",
+        default="api.pinecone.io",
+    )
+    pinecone_group.add_argument(
         "--pinecone_index_name",
         type=str,
         default=None,

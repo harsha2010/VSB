@@ -66,7 +66,7 @@ class PineconeDB(DB):
         name: str,
         config: dict,
     ):
-        self.pc = PineconeGRPC(config["pinecone_api_key"])
+        self.pc = PineconeGRPC(config["pinecone_api_key"], config["pinecone_host"])
         self.skip_populate = config["skip_populate"]
         self.overwrite = config["overwrite"]
         self.index_name = config["pinecone_index_name"]
