@@ -21,7 +21,7 @@ class Booking(ParquetWorkload):
 
     @staticmethod
     def request_count() -> int:
-        return 100
+        return 5000
 
     @staticmethod
     def dimensions() -> int:

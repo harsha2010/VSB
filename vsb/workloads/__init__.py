@@ -21,6 +21,7 @@ class Workload(Enum):
     MsMarcoV2AdaTest = "msmarco-v2-ada-test"
     Synthetic = "synthetic"
     SyntheticProportional = "synthetic-proportional"
+    Booking = "booking"
 
     def build(self, **kwargs) -> VectorWorkload:
         """Construct an instance of VectorWorkload based on the value of the enum."""
@@ -80,10 +81,10 @@ class Workload(Enum):
 
                 return MsMarcoV2Ada
 
-            case Workload.MsMarcoV2AdaTest:
-                from .msmarco_v2_ada.msmarco_v2_ada import MsMarcoV2AdaTest
+            case Workload.Booking:
+                from .booking.booking import Booking
 
-                return MsMarcoV2AdaTest
+                return Booking
 
     def describe(self) -> tuple[str, int, int, str, int]:
         """Return a tuple with attributes of the workload: name, dataset size, dimensionality, distance metric, and query count."""
