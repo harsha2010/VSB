@@ -1,11 +1,10 @@
 import logging
 
 from locust.exception import StopUser
-from pinecone.core.openapi.shared.exceptions import UnauthorizedException
 
 import vsb
 from vsb import logger
-from pinecone import PineconeException, NotFoundException
+from pinecone import PineconeException, NotFoundException, UnauthorizedException
 from pinecone.grpc import PineconeGRPC, GRPCIndex
 from tenacity import retry, stop_after_attempt, wait_exponential_jitter, after_log
 import grpc.experimental.gevent as grpc_gevent
@@ -112,6 +111,9 @@ class PineconeDB(DB):
                 f"PineconeDB index '{self.index_name}' has incorrect metric - expected:{metric.value}, found:{index_metric}"
             )
 
+    def close(self):
+        self.index.close()
+
     def get_batch_size(self, sample_record: Record) -> int:
         # Return the largest batch size possible, based on the following
         # constraints:
@@ -149,7 +151,7 @@ class PineconeDB(DB):
             msg = (
                 f"PineconeDB: Index '{self.index_name}' already exists - cowardly "
                 f"refusing to overwrite existing data. Specify --overwrite to "
-                f"delete it, or specify --skip-populate to skip population phase."
+                f"delete it, or specify --skip_populate to skip population phase."
             )
             logger.critical(msg)
             raise StopUser()
