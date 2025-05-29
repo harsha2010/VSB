@@ -19,7 +19,7 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -52,9 +52,13 @@ jobs:
     - name: Set up Docker Compose
       run: |
         docker compose -f docker/pgvector/docker-compose.yml up -d
+        docker compose -f docker/opensearch/docker-compose.yml up -d
     - name: Test with pytest
       run: |
-        poetry run pytest --durations=10
+        # Maximum observed test runtime in CI is ~60s. Set a per-test timeout of
+        # 2x (120s) to catch any stuck tests, but give some headroom in case any tests
+        # slow down a bit.
+        poetry run pytest --color=yes --durations=10 --timeout=120 --verbose
       env:
         ENVIRONMENT: ${{ matrix.environment == 'pod' && 'us-east4-gcp' || '' }}
         SERVERLESS_REGION: us-west-2
@@ -73,3 +77,4 @@ jobs:
       if: always()
       run: |
         docker compose -f docker/pgvector/docker-compose.yml down
+        docker compose -f docker/opensearch/docker-compose.yml down

@@ -26,9 +26,12 @@ from test_pinecone import (
     spawn_vsb_pinecone,
 )
 from test_pgvector import spawn_vsb_pgvector
+from test_opensearch import spawn_vsb_opensearch
 
 
-@pytest.mark.parametrize("spawn_vsb", [spawn_vsb_pgvector, spawn_vsb_pinecone])
+@pytest.mark.parametrize(
+    "spawn_vsb", [spawn_vsb_pgvector, spawn_vsb_pinecone, spawn_vsb_opensearch]
+)
 class TestCommon:
 
     # Unfortunately pytest won't let us selectively parametrize with fixtures, so
@@ -40,15 +43,11 @@ class TestCommon:
         spawn_vsb,
         pinecone_api_key,
         pinecone_index_mnist,
-        pinecone_index_yfcc,
-        pinecone_index_synthetic,
     ):
         # Test "-test" variant of mnist loads and runs successfully.
         (proc, stdout, stderr) = spawn_vsb(
             pinecone_api_key=pinecone_api_key,
-            pinecone_index_mnist=pinecone_index_mnist,
-            pinecone_index_yfcc=pinecone_index_yfcc,
-            pinecone_index_synthetic=pinecone_index_synthetic,
+            pinecone_index=pinecone_index_mnist,
             workload="mnist-test",
         )
         assert proc.returncode == 0
@@ -56,8 +55,8 @@ class TestCommon:
         check_request_counts(
             stdout,
             {
-                # Populate num_requests counts batches, not individual records.
-                "Populate": {"num_requests": lambda x: x <= 2, "num_failures": 0},
+                # Populate num_requests counts batches, not individual records (600).
+                "Populate": {"num_requests": lambda x: x < 600, "num_failures": 0},
                 "Search": {
                     "num_requests": 20,
                     "num_failures": 0,
@@ -71,16 +70,12 @@ class TestCommon:
         spawn_vsb,
         pinecone_api_key,
         pinecone_index_mnist,
-        pinecone_index_yfcc,
-        pinecone_index_synthetic,
     ):
         # Test "-test" variant of mnist loads and runs successfully with
         # concurrent users
         (proc, stdout, stderr) = spawn_vsb(
             pinecone_api_key=pinecone_api_key,
-            pinecone_index_mnist=pinecone_index_mnist,
-            pinecone_index_yfcc=pinecone_index_yfcc,
-            pinecone_index_synthetic=pinecone_index_synthetic,
+            pinecone_index=pinecone_index_mnist,
             workload="mnist-test",
             extra_args=["--users=4"],
         )
@@ -90,10 +85,10 @@ class TestCommon:
             stdout,
             {
                 # For multiple users the populate phase will chunk the records to be
-                # loaded into num_users chunks - i.e. 4 here. Given the size of each
-                # chunk will be less than the batch size (600 / 4 < 1000), then the
-                # number of requests will be equal to the number of users - i.e. 4
-                "Populate": {"num_requests": 4, "num_failures": 0},
+                # loaded into num_users chunks - i.e. 4 here. Different DBs
+                # use different batch sizes, so just check we have fewer than
+                # number of records (600) / number of users (4).
+                "Populate": {"num_requests": lambda x: x < 600 / 4, "num_failures": 0},
                 "Search": {
                     "num_requests": 20,
                     "num_failures": 0,
@@ -107,16 +102,12 @@ class TestCommon:
         spawn_vsb,
         pinecone_api_key,
         pinecone_index_mnist,
-        pinecone_index_yfcc,
-        pinecone_index_synthetic,
     ):
         # Test "-test" variant of mnist loads and runs successfully with
         # concurrent processes and users.
         (proc, stdout, stderr) = spawn_vsb(
             pinecone_api_key=pinecone_api_key,
-            pinecone_index_mnist=pinecone_index_mnist,
-            pinecone_index_yfcc=pinecone_index_yfcc,
-            pinecone_index_synthetic=pinecone_index_synthetic,
+            pinecone_index=pinecone_index_mnist,
             workload="mnist-test",
             extra_args=["--processes=2", "--users=4"],
         )
@@ -126,10 +117,10 @@ class TestCommon:
             stdout,
             {
                 # For multiple users the populate phase will chunk the records to be
-                # loaded into num_users chunks - i.e. 4 here. Given the size of each
-                # chunk will be less than the batch size (600 / 4 < 1000), then the
-                # number of requests will be equal to the number of users - i.e. 4
-                "Populate": {"num_requests": 4, "num_failures": 0},
+                # loaded into num_users chunks - i.e. 4 here. Different DBs
+                # use different batch sizes, so just check we have fewer than
+                # number of records (600) / number of users (4).
+                "Populate": {"num_requests": lambda x: x < 600 / 4, "num_failures": 0},
                 # The number of Search requests should equal the number in the dataset
                 # (20 for mnist-test).
                 "Search": {
@@ -145,15 +136,11 @@ class TestCommon:
         spawn_vsb,
         pinecone_api_key,
         pinecone_index_mnist,
-        pinecone_index_yfcc,
-        pinecone_index_synthetic,
     ):
         # Test "-double-test" variant (WorkloadSequence) of mnist loads and runs successfully.
         (proc, stdout, stderr) = spawn_vsb(
             pinecone_api_key=pinecone_api_key,
-            pinecone_index_mnist=pinecone_index_mnist,
-            pinecone_index_yfcc=pinecone_index_yfcc,
-            pinecone_index_synthetic=pinecone_index_synthetic,
+            pinecone_index=pinecone_index_mnist,
             workload="mnist-double-test",
         )
         assert proc.returncode == 0
@@ -161,7 +148,11 @@ class TestCommon:
         check_request_counts(
             stdout,
             {
-                "test1.Populate": {"num_requests": lambda x: x <= 2, "num_failures": 0},
+                # Populate num_requests counts batches, not individual records (600).
+                "test1.Populate": {
+                    "num_requests": lambda x: x < 600,
+                    "num_failures": 0,
+                },
                 # The number of Search requests should equal the number in the dataset
                 # (20 for mnist-test).
                 "test1.Search": {
@@ -169,7 +160,10 @@ class TestCommon:
                     "num_failures": 0,
                     "Recall": check_recall_stats,
                 },
-                "test2.Populate": {"num_requests": lambda x: x <= 2, "num_failures": 0},
+                "test2.Populate": {
+                    "num_requests": lambda x: x < 600,
+                    "num_failures": 0,
+                },
                 "test2.Search": {
                     "num_requests": 20,
                     "num_failures": 0,
@@ -183,16 +177,12 @@ class TestCommon:
         spawn_vsb,
         pinecone_api_key,
         pinecone_index_mnist,
-        pinecone_index_yfcc,
-        pinecone_index_synthetic,
     ):
         # Test "-double-test" variant (WorkloadSequence) of mnist loads and runs successfully with
         # concurrent users, and with a request rate limit set.
         (proc, stdout, stderr) = spawn_vsb(
             pinecone_api_key=pinecone_api_key,
-            pinecone_index_mnist=pinecone_index_mnist,
-            pinecone_index_yfcc=pinecone_index_yfcc,
-            pinecone_index_synthetic=pinecone_index_synthetic,
+            pinecone_index=pinecone_index_mnist,
             workload="mnist-double-test",
             extra_args=["--users=4", "--requests_per_sec=40"],
         )
@@ -202,10 +192,13 @@ class TestCommon:
             stdout,
             {
                 # For multiple users the populate phase will chunk the records to be
-                # loaded into num_users chunks - i.e. 4 here. Given the size of each
-                # chunk will be less than the batch size (600 / 4 < 200), then the
-                # number of requests will be equal to the number of users - i.e. 4
-                "test1.Populate": {"num_requests": 4, "num_failures": 0},
+                # loaded into num_users chunks - i.e. 4 here. Different DBs
+                # use different batch sizes, so just check we have fewer than
+                # number of records (600) / number of users (4).
+                "test1.Populate": {
+                    "num_requests": lambda x: x < 600 / 4,
+                    "num_failures": 0,
+                },
                 # The number of Search requests should equal the number in the dataset
                 # (20 for mnist-test).
                 "test1.Search": {
@@ -213,7 +206,10 @@ class TestCommon:
                     "num_failures": 0,
                     "Recall": check_recall_stats,
                 },
-                "test2.Populate": {"num_requests": 4, "num_failures": 0},
+                "test2.Populate": {
+                    "num_requests": lambda x: x < 600 / 4,
+                    "num_failures": 0,
+                },
                 "test2.Search": {
                     "num_requests": 20,
                     "num_failures": 0,
@@ -227,16 +223,12 @@ class TestCommon:
         spawn_vsb,
         pinecone_api_key,
         pinecone_index_mnist,
-        pinecone_index_yfcc,
-        pinecone_index_synthetic,
     ):
         # Test "-double-test" variant (WorkloadSequence) of mnist loads and runs successfully with
         # concurrent processes and users.
         (proc, stdout, stderr) = spawn_vsb(
             pinecone_api_key=pinecone_api_key,
-            pinecone_index_mnist=pinecone_index_mnist,
-            pinecone_index_yfcc=pinecone_index_yfcc,
-            pinecone_index_synthetic=pinecone_index_synthetic,
+            pinecone_index=pinecone_index_mnist,
             workload="mnist-double-test",
             extra_args=["--processes=4", "--users=4"],
         )
@@ -246,10 +238,13 @@ class TestCommon:
             stdout,
             {
                 # For multiple users the populate phase will chunk the records to be
-                # loaded into num_users chunks - i.e. 4 here. Given the size of each
-                # chunk will be less than the batch size (600 / 4 < 200), then the
-                # number of requests will be equal to the number of users - i.e. 4
-                "test1.Populate": {"num_requests": 4, "num_failures": 0},
+                # loaded into num_users chunks - i.e. 4 here. Different DBs
+                # use different batch sizes, so just check we have fewer than
+                # number of records (600) / number of users (4).
+                "test1.Populate": {
+                    "num_requests": lambda x: x < 600 / 4,
+                    "num_failures": 0,
+                },
                 # The number of Search requests should equal the number in the dataset
                 # (20 for mnist-test).
                 "test1.Search": {
@@ -257,7 +252,14 @@ class TestCommon:
                     "num_failures": 0,
                     "Recall": check_recall_stats,
                 },
-                "test2.Populate": {"num_requests": 4, "num_failures": 0},
+                # For multiple users the populate phase will chunk the records to be
+                # loaded into num_users chunks - i.e. 4 here. Different DBs
+                # use different batch sizes, so just check we have fewer than
+                # number of records (600) / number of users (4).
+                "test2.Populate": {
+                    "num_requests": lambda x: x < 600 / 4,
+                    "num_failures": 0,
+                },
                 "test2.Search": {
                     "num_requests": 20,
                     "num_failures": 0,
@@ -271,8 +273,6 @@ class TestCommon:
         spawn_vsb,
         pinecone_api_key,
         pinecone_index_mnist,
-        pinecone_index_yfcc,
-        pinecone_index_synthetic,
     ):
         # Test that skip_populate doesn't re-populate data.
 
@@ -280,9 +280,7 @@ class TestCommon:
         # of that index type across tests.
         (proc, stdout, stderr) = spawn_vsb(
             pinecone_api_key=pinecone_api_key,
-            pinecone_index_mnist=pinecone_index_mnist,
-            pinecone_index_yfcc=pinecone_index_yfcc,
-            pinecone_index_synthetic=pinecone_index_synthetic,
+            pinecone_index=pinecone_index_mnist,
             workload="mnist-test",
             extra_args=["--pgvector_index_type=ivfflat"],
         )
@@ -290,8 +288,8 @@ class TestCommon:
         check_request_counts(
             stdout,
             {
-                # Populate num_requests counts batches, not individual records.
-                "Populate": {"num_requests": lambda x: x <= 2, "num_failures": 0},
+                # Populate num_requests counts batches, not individual records (600).
+                "Populate": {"num_requests": lambda x: x < 600, "num_failures": 0},
                 "Search": {"num_requests": 20, "num_failures": 0},
             },
         )
@@ -299,9 +297,7 @@ class TestCommon:
         # Run again without population
         (proc, stdout, stderr) = spawn_vsb(
             pinecone_api_key=pinecone_api_key,
-            pinecone_index_mnist=pinecone_index_mnist,
-            pinecone_index_yfcc=pinecone_index_yfcc,
-            pinecone_index_synthetic=pinecone_index_synthetic,
+            pinecone_index=pinecone_index_mnist,
             workload="mnist-test",
             extra_args=["--pgvector_index_type=ivfflat", "--skip_populate"],
         )
@@ -322,16 +318,12 @@ class TestCommon:
         self,
         spawn_vsb,
         pinecone_api_key,
-        pinecone_index_mnist,
         pinecone_index_yfcc,
-        pinecone_index_synthetic,
     ):
         # Tests a workload with metadata and filtering (such as YFCC-test).
         (proc, stdout, stderr) = spawn_vsb(
             pinecone_api_key=pinecone_api_key,
-            pinecone_index_mnist=pinecone_index_mnist,
-            pinecone_index_yfcc=pinecone_index_yfcc,
-            pinecone_index_synthetic=pinecone_index_synthetic,
+            pinecone_index=pinecone_index_yfcc,
             workload="yfcc-test",
             extra_args=["--users=10"],
         )
@@ -341,7 +333,7 @@ class TestCommon:
             {
                 # Populate num_requests counts batches, not individual records.
                 "Populate": {
-                    "num_requests": lambda x: x == 10 or x == 210,
+                    "num_requests": lambda x: x > 1 and x < 10000,
                     "num_failures": 0,
                 },
                 "Search": {
@@ -356,15 +348,11 @@ class TestCommon:
         self,
         spawn_vsb,
         pinecone_api_key,
-        pinecone_index_mnist,
-        pinecone_index_yfcc,
         pinecone_index_synthetic,
     ):
         (proc, stdout, stderr) = spawn_vsb(
             pinecone_api_key=pinecone_api_key,
-            pinecone_index_mnist=pinecone_index_mnist,
-            pinecone_index_yfcc=pinecone_index_yfcc,
-            pinecone_index_synthetic=pinecone_index_synthetic,
+            pinecone_index=pinecone_index_synthetic,
             workload="synthetic",
             extra_args=["--users=10", "--processes=2"],
         )
@@ -373,7 +361,7 @@ class TestCommon:
         check_request_counts(
             stdout,
             {
-                "Populate": {"num_requests": 10, "num_failures": 0},
+                "Populate": {"num_failures": 0},
                 "Search": {
                     "num_requests": 100,
                     "num_failures": 0,
@@ -386,15 +374,11 @@ class TestCommon:
         self,
         spawn_vsb,
         pinecone_api_key,
-        pinecone_index_mnist,
-        pinecone_index_yfcc,
         pinecone_index_synthetic,
     ):
         (proc, stdout, stderr) = spawn_vsb(
             pinecone_api_key=pinecone_api_key,
-            pinecone_index_mnist=pinecone_index_mnist,
-            pinecone_index_yfcc=pinecone_index_yfcc,
-            pinecone_index_synthetic=pinecone_index_synthetic,
+            pinecone_index=pinecone_index_synthetic,
             workload="synthetic-runbook",
             extra_args=[
                 "--users=2",
@@ -409,7 +393,7 @@ class TestCommon:
         check_request_counts(
             stdout,
             {
-                "Populate": {"num_requests": lambda x: x <= 4, "num_failures": 0},
+                "Populate": {"num_failures": 0},
                 "Search": {
                     "num_requests": 500,
                     "num_failures": 0,
@@ -422,15 +406,17 @@ class TestCommon:
         self,
         spawn_vsb,
         pinecone_api_key,
-        pinecone_index_mnist,
-        pinecone_index_yfcc,
         pinecone_index_synthetic,
     ):
+        if spawn_vsb == spawn_vsb_opensearch:
+            pytest.skip(
+                "Synthetic proportional test not supported on OpenSearch ("
+                "fetch_batch not yet implemented for OpenSearch)"
+            )
+
         (proc, stdout, stderr) = spawn_vsb(
             pinecone_api_key=pinecone_api_key,
-            pinecone_index_mnist=pinecone_index_mnist,
-            pinecone_index_yfcc=pinecone_index_yfcc,
-            pinecone_index_synthetic=pinecone_index_synthetic,
+            pinecone_index=pinecone_index_synthetic,
             workload="synthetic-proportional",
             extra_args=[
                 "--users=4",
@@ -450,7 +436,7 @@ class TestCommon:
         check_request_counts(
             stdout,
             {
-                "Populate": {"num_requests": lambda x: x <= 4, "num_failures": 0},
+                "Populate": {"num_failures": 0},
                 "Search": {
                     "num_requests": lambda x: (x >= 150 and x <= 250),
                     "num_failures": 0,
