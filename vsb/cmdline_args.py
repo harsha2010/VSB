@@ -436,6 +436,33 @@ def add_vsb_cmdline_args(
         ),
     )
 
+    s3vector_group = parser.add_argument_group("Options specific to S3 Vector database")
+    s3vector_group.add_argument(
+        '--s3vec_region',
+        default='us-west-2',
+        help='AWS region for S3 Vectors service'
+    )
+    s3vector_group.add_argument(
+        '--s3vec_bucket_name',
+        help='S3 vector bucket name (auto-generated if not provided)'
+    )
+    s3vector_group.add_argument(
+        '--s3vec_index_name',
+        help='S3 vector index name (auto-generated if not provided)'
+    )
+    s3vector_group.add_argument(
+        '--s3vec_aws_access_key_id',
+        help='AWS access key ID (optional, can use environment/IAM)'
+    )
+    s3vector_group.add_argument(
+        '--s3vec_aws_secret_access_key',
+        help='AWS secret access key (optional)'
+    )
+    s3vector_group.add_argument(
+        '--s3vec_aws_session_token',
+        help='AWS session token (optional)'
+    )
+
 
 def get_action(parser, argument_name):
     """Helper to lookup the named Action from the parser."""

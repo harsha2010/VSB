@@ -9,6 +9,7 @@ class Database(Enum):
     Pinecone = "pinecone"
     OpenSearch = "opensearch"
     PGVector = "pgvector"
+    S3Vector = "s3vector"
 
     def get_class(self) -> type[DB]:
         """Return the DB class to use, based on the value of the enum"""
@@ -25,3 +26,8 @@ class Database(Enum):
                 from .pgvector.pgvector import PgvectorDB
 
                 return PgvectorDB
+            case Database.S3Vector:
+                from .s3vec.s3vec import S3VecDB
+
+                return S3VecDB
+
