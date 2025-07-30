@@ -21,6 +21,8 @@ class Workload(Enum):
     MsMarcoV2AdaTest = "msmarco-v2-ada-test"
     Synthetic = "synthetic"
     SyntheticProportional = "synthetic-proportional"
+    Hub_Spoke = "hub-spoke"
+    Drift = "drift"
 
     def build(self, **kwargs) -> VectorWorkload:
         """Construct an instance of VectorWorkload based on the value of the enum."""
@@ -84,6 +86,17 @@ class Workload(Enum):
                 from .msmarco_v2_ada.msmarco_v2_ada import MsMarcoV2AdaTest
 
                 return MsMarcoV2AdaTest
+
+            case Workload.Hub_Spoke:
+                from .adversarial.adversarial import HubSpoke
+
+                return HubSpoke
+
+            case Workload.Drift:
+                from .adversarial.adversarial import Drift
+
+                return Drift
+    
 
     def describe(self) -> tuple[str, int, int, str, int]:
         """Return a tuple with attributes of the workload: name, dataset size, dimensionality, distance metric, and query count."""
